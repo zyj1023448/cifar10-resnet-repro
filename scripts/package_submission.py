@@ -74,7 +74,7 @@ notes = f"""# 论文提交材料
 
 ```powershell
 python -m venv .venv
-.venv\\Scripts\\python.exe -m pip install -r requirements.txt
+.venv/Scripts/python.exe -m pip install -r requirements.txt
 python scripts/prepare_cifar.py   # 下载/缓存 CIFAR-10
 python scripts/run_grid.py        # 26 组训练，单卡 RTX 5060 约 3 小时
 python -m src.analyze             # 汇总、检验、全部图表
