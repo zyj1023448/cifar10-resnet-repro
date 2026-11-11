@@ -332,10 +332,13 @@ def front_matter() -> None:
         f"深度增至 56 层时，普通网络出现明显退化，残差网络则继续提升。SE 只带来 "
         f"{delta('ResNet-20', 'SE-ResNet-20'):+.2f} 个百分点的准确率变化，但把期望校准误差从 "
         f"{ece('ResNet-20'):.4f} 降到 {ece('SE-ResNet-20'):.4f}，"
-        "并在多种常见损坏下更稳定；压缩比和插入位置的消融差异大多在 0.2 个百分点以内。mixup 与标签"
-        "平滑在 100 epoch 预算下没有提高干净准确率，标签平滑主要改善校准。结果说明：在这一参数规模下，"
-        "残差带来的优化收益是主导因素，通道注意力更多改善置信度质量而非判别精度。代码、全部训练权重与"
-        "逐样本预测已随文公开。"
+        "并在多种常见损坏下更稳定；压缩比和插入位置的消融差异大多在 0.2 个百分点以内。预激活与 Mixup "
+        f"分别带来 {acc('PreAct-ResNet-20') - acc('SE-ResNet-20'):+.2f} 和 "
+        f"{acc('SE-ResNet-20 + Mixup(0.2)') - acc('SE-ResNet-20'):+.2f} 个百分点的均值变化（预激活的"
+        f"种子间波动较大，Mixup 更稳定），说明在短预算下数据正则比通道注意力更有效；标签平滑反而"
+        f"同时降低准确率与校准。结果说明：在这一参数规模下，"
+        "残差带来的优化收益是主导因素，通道注意力更多改善鲁棒性与置信度质量，而非判别精度。代码、"
+        "全部训练权重与逐样本预测已随文公开。"
     )
     rich([("摘  要：", True), (abstract, False)])
 
@@ -381,10 +384,14 @@ def front_matter() -> None:
         f"improving. SE changes accuracy by only {delta('ResNet-20', 'SE-ResNet-20'):+.2f} points, yet lowers "
         f"expected calibration error from {ece('ResNet-20'):.4f} to {ece('SE-ResNet-20'):.4f} and is more stable "
         "under common corruptions; ablations on the reduction ratio and insertion scope differ by less than "
-        "0.2 points in most cases. Mixup and label smoothing do not improve clean accuracy at this budget, and "
-        "label smoothing mainly helps calibration. The results suggest that, at this scale, the optimisation "
-        "benefit of residual learning dominates, whereas channel attention improves the quality of confidence "
-        "rather than raw discrimination. Code, all trained weights and per-sample predictions are released."
+        "0.2 points in most cases. Pre-activation and Mixup add "
+        f"{acc('PreAct-ResNet-20') - acc('SE-ResNet-20'):+.2f} and "
+        f"{acc('SE-ResNet-20 + Mixup(0.2)') - acc('SE-ResNet-20'):+.2f} points respectively, showing that at this "
+        "budget architecture and regularisation matter more than channel attention, while label smoothing "
+        "hurts both accuracy and calibration. The results suggest that, at this scale, the optimisation "
+        "benefit of residual learning dominates, whereas channel attention mainly improves robustness and "
+        "the quality of confidence rather than raw discrimination. Code, all trained weights and "
+        "per-sample predictions are released."
     )
     rich([("Abstract: ", True), (abstract_en, False)], size=10)
 
@@ -458,6 +465,8 @@ def section_related() -> None:
         "值得注意的是，退化并不是在所有配方下都同样明显。BatchNorm[5] 让深网络的优化更容易，余弦"
         "退火[6] 和足够长的训练也会削弱深度带来的优化困难。因此，复现退化需要使用同一套现代配方，"
         "并报告多个种子的波动；直接引用原论文的误差曲线，可能会高估或低估残差的作用。"
+        "从 ImageNet[24] 到 CIFAR，残差结构之所以被广泛采用，正是因为它把“加深”从一件冒险的事"
+        "变成了可控的工程选择；本文关心的则是这一收益在小规模、短预算下还剩多少。"
     )
     heading("2.2  通道注意力与轻量模型", 2)
     body(
@@ -489,7 +498,8 @@ def section_related() -> None:
         "在鲁棒性方面，Hendrycks 与 Dietterich[18] 提出的 CIFAR-10-C 用 15 类常见损坏、5 个 severity"
         "评测分布偏移；本文取其四类（噪声、模糊、对比度、亮度）各 3 个 severity，作为轻量替代。"
         "在可解释性方面，Grad-CAM[19] 用最后一层特征的梯度加权和定位判别区域；本文用它比较三种模型"
-        "的关注区域是否与真实物体一致。"
+        "的关注区域是否与真实物体一致。Recht 等[25] 则提醒，基准上的高准确率不一定能迁移到分布"
+        "偏移的数据，这也是本文加入损坏鲁棒性评测的原因之一。"
     )
 
 
@@ -506,7 +516,8 @@ def section_method() -> None:
     heading("3.2  普通网络与残差网络", 2)
     body(
         "普通网络（Plain）的每个基本块由两个 3×3 卷积、两个 BatchNorm 和两个 ReLU 组成，块与块之间"
-        "直接串联，没有旁路。残差网络（ResNet）在同样的卷积栈外增加一条恒等映射："
+        "直接串联，没有旁路，如图 1(a) 所示。残差网络（ResNet）在同样的卷积栈外增加一条恒等映射，"
+        "结构如图 1(b)："
     )
     equation("y = F(x, W) + x,        F(x, W) = W₂ · σ(BN(W₁ · σ(BN(x))))")
     body(
@@ -517,7 +528,8 @@ def section_method() -> None:
     )
     heading("3.3  SE 通道注意力", 2)
     body(
-        "设残差块输出 U∈ℝ^(C×H×W)。SE 模块先做全局平均池化得到通道描述子 z∈ℝ^C："
+        "SE 模块的结构如图 1(c) 所示：设残差块输出 U∈ℝ^(C×H×W)。SE 模块先做全局平均池化得到通道描述子"
+        " z∈ℝ^C："
     )
     equation("z_c = (1/(H·W)) ΣΣ U_c(i, j)")
     body("再用两层全连接（中间维度 C/r）和 Sigmoid 生成通道权重 s，并对 U 逐通道缩放：")
@@ -604,7 +616,8 @@ def section_setup() -> None:
         "标注 n。所有方法使用完全相同的训练配方，唯一变化是待考察的结构或正则项。报告时给出每个"
         "种子的准确率和均值 ± 标准差，避免只展示最好的一次。对同一测试集上的配对预测，McNemar"
         "检验回答“两个模型的错误集合是否显著不同”，bootstrap 给出差值的不确定性；两者互补，"
-        "因为前者对系统性差异敏感，后者对样本波动敏感。"
+        "因为前者对系统性差异敏感，后者对样本波动敏感。Dietterich[26] 系统讨论过这类配对检验的"
+        "适用条件，本文按他的建议同时报告检验统计量与效应大小。"
     )
 
 
@@ -636,6 +649,14 @@ def robust_train_min(names: list[str]) -> float:
     med = float(np.median(vals))
     vals = [v for v in vals if v < 2 * med]
     return float(np.median(vals))
+
+
+def train_acc_final(name: str) -> float:
+    vals = []
+    for rid in g(name)["runs"]:
+        rec = json.loads((RESULTS / "runs" / f"{rid}.json").read_text(encoding="utf8"))
+        vals.append(rec["history"][-1]["train_acc"])
+    return 100 * float(np.mean(vals))
 
 
 def per_class(run_id: str) -> list[float]:
@@ -741,12 +762,26 @@ def section_results() -> None:
         body("深度实验尚未完成，本节将在补充实验后更新。")
 
     heading("5.3  注意力设计与正则化消融", 2)
-    abl = [n for n in G if n.startswith("SE-ResNet-20") or n.startswith("PreAct")]
+    order = [
+        "SE-ResNet-20",
+        "SE-ResNet-20 + r=4",
+        "SE-ResNet-20 + r=16",
+        "SE-ResNet-20 + stage3-only",
+        "SE-ResNet-20 + last-block-only",
+        "PreAct-ResNet-20",
+        "SE-ResNet-20 + Mixup(0.2)",
+        "SE-ResNet-20 + LS(0.1)",
+        "SE-ResNet-20 + Mixup(0.2) + LS(0.1)",
+    ]
+    abl = [n for n in order if n in G]
+    abl += [n for n in G if (n.startswith("SE-ResNet-20") or n.startswith("PreAct")) and n not in abl]
     body(
-        "表 4 汇总了 SE 的压缩比、插入范围、预激活结构以及 Mixup、标签平滑的消融。所有变体都在"
-        "ResNet-20 骨架上训练 100 epoch，除被考察的因子外配方完全相同。整体上看，各变体与"
-        f"SE-ResNet-20 的差距大多在 0.2 个百分点以内，说明在 0.27M 参数、16/32/64 通道的规模下，"
-        "注意力模块的具体设计不是决定性的；真正拉开差距的是有没有残差连接。"
+        "表 4 与图 4 汇总了 SE 的压缩比、插入范围、预激活结构以及 Mixup、标签平滑的消融。所有变体都在"
+        "ResNet-20 骨架上训练 100 epoch，除被考察的因子外配方完全相同。先看 SE 的设计维度：不同"
+        "压缩比、插入范围和激活顺序之间的差距大多在 0.2 个百分点以内，说明在 0.27M 参数、"
+        "16/32/64 通道的规模下，注意力模块的具体设计不是决定性的；真正拉开差距的是有没有残差"
+        "连接（表 2）。再看正则化：Mixup 把准确率提高到 92.30%，标签平滑反而降到 91.34%，两者"
+        "方向相反。"
     )
     if "SE-ResNet-20 + r=4" in G and "SE-ResNet-20 + r=16" in G:
         body(
@@ -756,12 +791,26 @@ def section_results() -> None:
             f"“r 在 8–16 之间较稳”一致，只是这里的绝对差异更小。"
         )
     body(
-        "插入范围方面，只在 stage3 插入与每个块都插入的差异很小，说明浅层通道（16、32）的"
-        "重标定对最终精度贡献有限；只在每个 stage 末块插入也没有显著变化。预激活版本把 BN 和 ReLU"
-        "移到卷积前，理论上恒等路径更干净，但在 20 层、100 epoch 的设置下没有超过后激活版本。"
-        "正则化方面，Mixup 与标签平滑都没有提高干净准确率：Mixup 在短预算下让训练误差下降更慢，"
-        "属于欠拟合；标签平滑主要改变置信度分布，对 top-1 准确率略有负面影响。这些负结果同样"
-        "重要——它们说明原论文的增益不能被无条件迁移到小模型、短预算的场景。"
+        f"插入范围方面，只在 stage3 插入为 {acc('SE-ResNet-20 + stage3-only'):.2f}%，只在每个 stage 末块"
+        f"插入为 {acc('SE-ResNet-20 + last-block-only'):.2f}%，与每块插入的 {acc('SE-ResNet-20'):.2f}% 相差"
+        f"不到 0.2 个百分点，说明浅层通道（16、32）的重标定对最终精度贡献有限；把注意力集中在深层，"
+        f"可以在几乎不损失精度的情况下减少开销。预激活版本把 BN 和 ReLU 移到卷积前，均值 "
+        f"{acc('PreAct-ResNet-20'):.2f}%，比后激活高 {acc('PreAct-ResNet-20') - acc('SE-ResNet-20'):+.2f}，"
+        f"但两个种子分别为 "
+        f"{', '.join(f'{v:.2f}' for v in g('PreAct-ResNet-20')['acc_per_seed'])}%，波动与增益同量级，"
+        f"只能视为弱证据：它说明恒等路径的细节会影响优化，但收益远小于残差连接本身。"
+    )
+    mix = acc("SE-ResNet-20 + Mixup(0.2)")
+    ls = acc("SE-ResNet-20 + LS(0.1)")
+    mls = acc("SE-ResNet-20 + Mixup(0.2) + LS(0.1)")
+    body(
+        f"正则化方面，结果与“强正则需要长训练”的直觉并不完全一致。Mixup 达到 {mix:.2f}%，比 SE 基线高 "
+        f"{mix - acc('SE-ResNet-20'):+.2f} 个百分点，是单项最大的增益；此时基线在训练集上已接近饱和，"
+        f"Mixup 的插值约束正好缓解了过拟合。标签平滑则降到 {ls:.2f}%（{ls - acc('SE-ResNet-20'):+.2f}），"
+        f"ECE 从 {ece('SE-ResNet-20'):.4f} 升到 {ece('SE-ResNet-20 + LS(0.1)'):.4f}，说明在 100 epoch、"
+        f"无早停的设置下，平滑带来的欠自信超过了正则收益。两者组合为 {mls:.2f}%，没有超过单独使用 Mixup。"
+        f"这些结果说明：正则化的收益依赖训练预算和数据难度，不能把 ImageNet 或长训练下的结论直接搬到"
+        f"小模型、短预算的场景。"
     )
     rows = []
     for name in abl:
@@ -772,7 +821,7 @@ def section_results() -> None:
               [5.8, 3.6, 2.1, 2.2, 1.5],
               "表 4  SE 设计与正则化消融（ResNet-20 骨架，100 epoch）", font_size=7.8)
     add_figure("fig_ablation.png", 11.5,
-               "图 4  SE 设计与正则化消融的测试准确率（误差棒为标准差）")
+               "图 4  SE 设计与正则化消融的测试准确率（红色为 SE 基线，蓝色为结构变体，橙色为正则化变体）")
 
     heading("5.4  置信度校准", 2)
     body(
@@ -784,9 +833,12 @@ def section_results() -> None:
         f"通常带来的收益；它更像是结构带来的副产品，而不是可以单独依赖的校准手段。"
     )
     body(
-        "标签平滑的对照提供了另一个视角：它把 ECE 进一步压低，但 top-1 准确率没有提高，"
-        "属于典型的“校准—精度”权衡。对需要可靠置信度的应用，标签平滑可能比 SE 更直接；"
-        "对只关心 top-1 的场景，两者的收益都有限。"
+        "标签平滑的对照提供了反例：它的 ECE 为 "
+        f"{ece('SE-ResNet-20 + LS(0.1)'):.4f}，Mixup 与标签平滑的组合更高，说明在短预算下平滑让模型"
+        "系统性欠自信，而不是更接近真实正确率；Mixup 的 ECE 介于 Plain-20 与 SE-ResNet-20 之间。"
+        "可见准确率与校准不是同一个目标：Mixup 提高了 top-1，却没有同步改善 ECE；SE 的精度增益很小，"
+        "却是三个主模型中校准最好的。对需要可靠置信度的应用，不能假设“更强的正则”一定带来更好的"
+        "校准，仍应单独测量 ECE。"
     )
     add_figure("fig_reliability.png", 8.2, "图 5  可靠性图（括号内为 ECE）")
 
@@ -833,12 +885,20 @@ def section_results() -> None:
     heading("5.7  错误结构", 2)
     conf = top_confusions(rid["SE-ResNet-20"], 4)
     conf_text = "、".join(f"{a}→{b}（{100*c:.1f}%）" for a, b, c in conf)
+    pc_se = per_class(rid["SE-ResNet-20"])
+    pc_r = per_class(rid["ResNet-20"])
+    diff = [a - b for a, b in zip(pc_se, pc_r)]
+    best_i = int(np.argmax(diff))
+    worst_i = int(np.argmin(diff))
+    cn_names = ["飞机", "汽车", "鸟", "猫", "鹿", "狗", "蛙", "马", "船", "卡车"]
     body(
         f"图 9 是三个模型的归一化混淆矩阵（对角线已掩去，颜色越深表示误分比例越高），"
         f"图 10 给出三个模型的分类别准确率。最主要的混淆是"
         f"{conf_text}，这些类别在 32×32 分辨率下外观接近，且训练样本中存在标注边界模糊的样本。"
-        f"三个模型的错误结构高度相似，说明残差与注意力改变的是“错多少”，而不是“错在哪里”；"
-        f"SE 在个别类别上的小幅提升被另一些类别的波动抵消，因而总体准确率变化不显著。"
+        f"三个模型的错误结构高度相似，说明残差与注意力改变的是“错多少”，而不是“错在哪里”。"
+        f"SE 相对 ResNet-20 在{cn_names[best_i]}类上提升最大（{pc_r[best_i]:.1f}%→{pc_se[best_i]:.1f}%，"
+        f"{diff[best_i]:+.1f} 个百分点），在{cn_names[worst_i]}类上最低（{diff[worst_i]:+.1f}），"
+        f"正负相抵后总体变化不显著。"
     )
     add_figure("fig_confusion.png", 15.2,
                "图 9  归一化混淆矩阵（对角线已掩去，数值为行归一化的误分百分比）")
@@ -855,15 +915,20 @@ def section_results() -> None:
         "把三组证据放在一起，可以得到一个清晰的分解：在 0.27M 参数的 CIFAR-10 模型上，残差连接"
         f"贡献了约 {r20 - p20:.2f} 个百分点的准确率，SE 只贡献了 {se_delta:+.2f} 个百分点；"
         "深度从 20 增到 56 时，普通网络退化、残差网络继续提升，进一步说明残差的收益来自优化而非"
-        "容量。SE 的收益主要体现在 ECE 和 NLL 的小幅下降，以及在四类损坏下稳定但幅度有限的鲁棒性优势。"
+        "容量。SE 的收益主要体现在 ECE 和 NLL 的小幅下降，以及在四类损坏下稳定但幅度有限的鲁棒性"
+        "优势；预激活与 Mixup 的精度增益（约 +0.25 和 +0.55）都大于 SE，说明在这一尺度上结构选择与"
+        "数据正则比通道重标定更直接。"
     )
     body(
         "为什么 SE 在这里不起作用？第一，通道数太少。SE 的通道描述子只有 16/32/64 维，两层全连接"
         "能表达的通道依赖很有限；原论文在 ResNet-50 的 256/512/1024 通道上报告了更大增益。第二，"
         "全局平均池化丢失了空间位置，而 CIFAR-10 的判别线索往往在局部（如鸟喙、车轮），通道重标定"
-        "无法利用这些线索。第三，100 epoch 的预算下模型尚未充分拟合，注意力带来的额外非线性反而"
-        "增加了优化难度。这三条解释与消融结果一致：r 和插入位置的影响都很小，说明瓶颈不在设计细节，"
-        "而在容量与任务尺度。"
+        "无法利用这些线索。第三，100 epoch 下模型在训练集上已接近饱和（训练准确率 99%–100%），"
+        "SE 并没有把训练误差进一步压低（最终训练损失 0.025 对 0.020），说明额外参数没有带来可迁移的"
+        "拟合能力。这三条解释与消融结果一致：r 和插入位置的影响都很小，说明瓶颈不在设计"
+        "细节，而在容量与任务尺度。预激活的对照提供了旁证：它只改变了 BN/ReLU 的位置，均值提高约"
+        " 0.25 个百分点，但两个种子相差 0.43，证据较弱；Mixup 的 +0.55 更稳定。可见在这一尺度上，"
+        "数据正则与结构细节都比通道重标定更有杠杆，而它们的作用又都小于残差连接本身。"
     )
     body(
         "与文献的差异也需要说明。原论文在 ImageNet 上报告 SE 带来约 1.5 个百分点的 top-1 提升，"
@@ -887,15 +952,16 @@ def section_conclusion() -> None:
         "网络的深度对照，并把 SE 通道注意力嵌入残差块，考察其在精度、校准和鲁棒性上的实际收益。"
         f"20 层上残差连接把准确率从 {acc('Plain-20'):.2f}% 提到 {acc('ResNet-20'):.2f}%，56 层上"
         f"普通网络退化而残差网络继续提升；SE 只带来 {acc('SE-ResNet-20') - acc('ResNet-20'):+.2f} "
-        "个百分点的精度变化，但降低了 ECE 与 NLL，并在四类常见损坏下保持稳定优势。消融显示压缩比和插入"
-        "位置的影响很小，Mixup 与标签平滑在短预算下没有提高干净准确率。"
+        "个百分点的精度变化，但降低了 ECE 与 NLL，并在四类常见损坏下平均高约 2 个百分点。消融显示"
+        "压缩比和插入位置的影响很小，预激活与 Mixup 的增益更大，而标签平滑在短预算下反而损害准确率"
+        "与校准。"
     )
     body(
         "这些结果支持的结论是：在轻量模型上，残差连接是主导因素，通道注意力是次要的、更多作用于"
-        "置信度质量的模块。对于实际应用，如果目标是 top-1 准确率，应优先保证残差结构、足够的宽度"
-        "和训练预算；如果目标包含可靠的置信度，SE 或标签平滑可以作为低成本的补充。本文不提出新"
-        "结构，贡献在于把复现、消融和多维分析放在同一套可复查的实验里，并公开全部代码、权重与"
-        "逐样本预测。"
+        "鲁棒性与置信度质量的模块；结构与数据正则（预激活、Mixup）比注意力更值得优先尝试。对于"
+        "实际应用，如果目标是 top-1 准确率，应优先保证残差结构、足够的宽度和训练预算；如果目标"
+        "包含可靠的置信度或损坏鲁棒性，SE 可以作为低成本的补充。本文不提出新结构，贡献在于把复现、"
+        "消融和多维分析放在同一套可复查的实验里，并公开全部代码、权重与逐样本预测。"
     )
 
 
@@ -999,6 +1065,7 @@ def section_appendix() -> None:
         ".npz 文件保存了 10,000 张测试图的 logits 与标签，McNemar、ECE、混淆矩阵都可由此复算。"
     )
 
+    doc.add_page_break()
     heading("附录 B  运行环境与训练开销")
     env_rows = [
         ["GPU", "NVIDIA GeForce RTX 5060 Laptop GPU, 8 GB"],

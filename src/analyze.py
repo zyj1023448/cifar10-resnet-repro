@@ -202,7 +202,8 @@ def plot_ablation(g: dict, summ: dict, names: list[str]) -> None:
     errs = [summ[n]["acc_std"] for n in names]
     fig, ax = plt.subplots(figsize=(5.4, 0.36 * len(names) + 1.2))
     y = np.arange(len(names))
-    colors = [C_SE if "SE-ResNet-20" == n else "#f0a202" for n in names]
+    colors = [C_SE if n == "SE-ResNet-20" else ("#f0a202" if ("Mixup" in n or "LS" in n) else "#6baed6")
+              for n in names]
     ax.barh(y, vals, xerr=errs, color=colors, alpha=0.85, capsize=3, height=0.62)
     ax.set_yticks(y)
     ax.set_yticklabels(names, fontsize=8)
@@ -251,7 +252,7 @@ def plot_confusion(run_ids: dict) -> None:
         acc = (d["logits"].argmax(1) == d["labels"]).mean()
         cm /= cm.sum(1, keepdims=True)
         err = np.ma.masked_array(cm, mask=np.eye(10, dtype=bool))
-        im = ax.imshow(err, cmap="Reds", vmin=0, vmax=0.22)
+        im = ax.imshow(err, cmap="Reds", vmin=0, vmax=0.12)
         for i in range(10):
             for j in range(10):
                 if i != j and cm[i, j] >= 0.04:

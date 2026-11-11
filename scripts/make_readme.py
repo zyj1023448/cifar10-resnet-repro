@@ -6,16 +6,29 @@ import hashlib
 import json
 from pathlib import Path
 
+import numpy as np
+
 ROOT = Path(__file__).resolve().parents[1]
 SUMMARY = json.loads((ROOT / "results" / "summary.json").read_text(encoding="utf8"))
 G = SUMMARY["groups"]
+
+
+def train_min(name: str) -> float:
+    """Median run time from per-epoch timings, ignoring suspended epochs."""
+    vals = []
+    for rid in G[name]["runs"]:
+        rec = json.loads((ROOT / "results" / "runs" / f"{rid}.json").read_text(encoding="utf8"))
+        ts = [h["time_s"] for h in rec["history"]]
+        med = float(np.median(ts))
+        vals.append(sum(t for t in ts if t < 3 * med) / 60)
+    return float(np.median(vals))
 
 
 def row(name: str) -> str:
     s = G[name]
     return (f"| {name} | {s['acc_mean']:.2f} ± {s['acc_std']:.2f} | {s['f1_mean']:.2f} | "
             f"{s['ece_mean']:.4f} | {s['nll_mean']:.4f} | {s['params']/1e6:.3f} | "
-            f"{s['time_mean_s']/60:.1f} | {s['n']} |")
+            f"{train_min(name):.1f} | {s['n']} |")
 
 
 def main() -> None:
@@ -56,6 +69,11 @@ def main() -> None:
         f"{p2['bootstrap_diff_pp'][1]:.2f}] pp), but ECE drops from "
         f"{G['ResNet-20']['ece_mean']:.4f} to {G['SE-ResNet-20']['ece_mean']:.4f}.",
         "- Depth 56: the plain network degrades, the residual network improves. See `results/figures/fig_depth.png`.",
+        f"- Mixup adds **{G['SE-ResNet-20 + Mixup(0.2)']['acc_mean'] - G['SE-ResNet-20']['acc_mean']:+.2f} pp** "
+        f"on top of SE-ResNet-20; pre-activation adds "
+        f"{G['PreAct-ResNet-20']['acc_mean'] - G['SE-ResNet-20']['acc_mean']:+.2f} pp but with larger seed variance.",
+        f"- Label smoothing *hurts* both accuracy ({G['SE-ResNet-20 + LS(0.1)']['acc_mean']:.2f}%) and "
+        f"calibration (ECE {G['SE-ResNet-20 + LS(0.1)']['ece_mean']:.4f}) at this budget.",
         "",
         "## Depth study",
         "",

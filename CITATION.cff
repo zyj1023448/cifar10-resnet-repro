@@ -12,7 +12,7 @@ authors:
 version: 1.0.0
 date-released: "2026-11-11"
 license: MIT
-repository-code: "https://github.com/REPLACE_ME/cifar10-resnet-repro"
+repository-code: "https://github.com/zyj1023448/cifar10-resnet-repro"
 keywords:
   - residual learning
   - channel attention
