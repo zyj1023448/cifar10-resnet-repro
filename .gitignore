@@ -1,0 +1,21 @@
+# Data and local caches
+data/
+.tmp/
+*.part
+.chunk_*
+.cifar_*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.venv*/
+
+# OS / editors
+Thumbs.db
+.DS_Store
+.vscode/
+.idea/
+
+# Paper build intermediates
+paper/~$*

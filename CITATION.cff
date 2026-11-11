@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use this code or the trained weights, please cite the accompanying paper."
+title: "Residual Learning and Channel Attention for CIFAR-10 Classification: A Reproduction and Empirical Study"
+abstract: >-
+  A controlled reproduction of residual learning on CIFAR-10, extended with
+  squeeze-and-excitation channel attention, together with ablations on depth,
+  attention placement, mixup and label smoothing.
+authors:
+  - family-names: Zhao
+    given-names: Yanjie
+    affiliation: "Department of Automation, North China Electric Power University (Baoding), Baoding 071003, China"
+version: 1.0.0
+date-released: "2026-11-11"
+license: MIT
+repository-code: "https://github.com/REPLACE_ME/cifar10-resnet-repro"
+keywords:
+  - residual learning
+  - channel attention
+  - CIFAR-10
+  - reproducibility
+  - image classification
