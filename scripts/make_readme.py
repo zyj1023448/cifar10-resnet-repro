@@ -55,6 +55,15 @@ def main() -> None:
         "it asks how much of the gain of a residual network comes from the residual path, and how much "
         "channel attention adds on a 0.27M-parameter CIFAR backbone under a fixed 100-epoch budget.",
         "",
+        "## Reference papers",
+        "",
+        "- **Primary reproduction:** He K, Zhang X, Ren S, Sun J. *Deep Residual Learning for Image "
+        "Recognition.* CVPR 2016: 770-778 (CIFAR-10 depth comparison, Table 6).",
+        "- **Attention module:** Hu J, Shen L, Sun G. *Squeeze-and-Excitation Networks.* CVPR 2018: "
+        "7132-7141 (SE block, reduction ratio).",
+        "- Additional references: pre-activation ResNet (ECCV 2016), Mixup (ICLR 2018), label smoothing "
+        "(CVPR 2016; NeurIPS 2019), cosine annealing (ICLR 2017), CIFAR-10-C (ICLR 2019).",
+        "",
         "## Results at a glance",
         "",
         "| Method | Test acc (%) | Macro-F1 (%) | ECE | NLL | Params (M) | Train (min) | Seeds |",

@@ -324,9 +324,10 @@ def front_matter() -> None:
     abstract = (
         "残差网络是深度视觉识别的基础结构，压缩-激励（squeeze-and-excitation, SE）等通道注意力模块"
         "则常被用来以很小的参数代价提升性能。然而在 CIFAR-10 这类小规模基准上，两者的实际收益容易被"
-        "训练配方、模型容量和随机种子掩盖。本文在统一的数据划分、数据增强、优化器和 100 epoch 预算下，"
-        f"复现普通卷积网络与残差网络在 20 层和 56 层上的对照实验，并把 SE 模块嵌入残差块，系统考察其"
-        f"在精度、置信度校准和损坏鲁棒性上的收益。20 层上，残差连接把测试准确率从 {acc('Plain-20'):.2f}% "
+        "训练配方、模型容量和随机种子掩盖。本文以 ResNet（He 等，2016）在 CIFAR-10 上的 20/56 层"
+        "对照为主要复现对象，并把 SENet（Hu 等，2018）的 SE 模块嵌入残差块作为扩展；在统一的数据划分、"
+        "数据增强、优化器和 100 epoch 预算下，系统考察其在精度、置信度校准和损坏鲁棒性上的收益。"
+        f"20 层上，残差连接把测试准确率从 {acc('Plain-20'):.2f}% "
         f"提高到 {acc('ResNet-20'):.2f}%（+{delta('Plain-20', 'ResNet-20'):.2f} 个百分点）；以种子 42 的"
         f"配对预测为例，McNemar 检验给出 {p_text(pair('ResNet-20_vs_Plain-20')['mcnemar']['p_value'])}。"
         f"深度增至 56 层时，普通网络出现明显退化，残差网络则继续提升。SE 只带来 "
@@ -374,9 +375,10 @@ def front_matter() -> None:
         "Residual connections underpin modern visual recognition, while channel attention modules such as "
         "squeeze-and-excitation (SE) are widely advertised as near-free accuracy gains. On small benchmarks "
         "like CIFAR-10, however, both effects are easily confounded by training recipes, model capacity and "
-        "random seeds. Under a single data split, augmentation pipeline, optimiser and 100-epoch budget, we "
-        f"reproduce the plain-versus-residual comparison at depths 20 and 56, and insert SE modules into the "
-        f"residual blocks to measure accuracy, calibration and corruption robustness. At depth 20, residual "
+        "random seeds. We reproduce the CIFAR-10 depth comparison of ResNet (He et al., 2016) and extend it "
+        "with the squeeze-and-excitation (SE) module of SENet (Hu et al., 2018). Under a single data split, "
+        "augmentation pipeline, optimiser and 100-epoch budget, we measure accuracy, calibration and "
+        "corruption robustness at depths 20 and 56. At depth 20, residual "
         f"learning raises test accuracy from {acc('Plain-20'):.2f}% to {acc('ResNet-20'):.2f}% "
         f"(+{delta('Plain-20', 'ResNet-20'):.2f} points over three seeds; "
         f"{p_text(pair('ResNet-20_vs_Plain-20')['mcnemar']['p_value'])} on the seed-42 pair). "
@@ -436,12 +438,18 @@ def section_intro() -> None:
         "精度、校准或鲁棒性收益？RQ3：若收益有限，限制因素是什么——深度、容量、插入位置，还是训练预算？"
     )
     body(
-        "本文的工作可以概括为四点。第一，给出一个严格对照的复现：普通网络与残差网络共享数据划分、增强、"
+        "本文的复现对象是 ResNet[3] 在 CIFAR-10 上的 20/56 层对照（原论文第 4.2 节的 CIFAR 实验），"
+        "扩展模块来自 SENet[7]。除特别说明外，所有模型共享同一数据划分、增强、优化器和训练预算；"
+        "因此本文报告的是在这套协议下的重新测量，而不是原论文数字的转述。"
+    )
+    body(
+        "本文的创新点与主要工作可以概括为四点。第一，给出一个严格对照的复现：普通网络与残差网络共享数据划分、增强、"
         "优化器、学习率日程和 epoch 预算，20 层与 56 层各跑多个随机种子，报告均值、标准差和配对检验，"
         "而不是挑一个最好结果。第二，把 SE 模块嵌入残差块，系统消融压缩比、插入范围和预激活结构，"
         "量化其精度与参数开销。第三，从训练动态、置信度校准、损坏鲁棒性、特征判别性和错误结构五个维度"
         "解释结果，指出残差是主导因素、注意力主要改善置信度质量这一结论的边界。第四，公开全部代码、"
         f"{N_RUNS} 组训练权重、逐样本预测和论文构建脚本，所有表格与图均可由一条命令重新生成。"
+        "前三点分别对应 RQ1–RQ3；第 5.8 节的表 7 给出每条结论的证据与边界。"
     )
     body(
         "后文安排如下：第 2 节回顾相关工作；第 3 节给出网络结构、训练目标和评测指标；第 4 节说明数据、"
@@ -933,8 +941,34 @@ def section_results() -> None:
     body(
         "与文献的差异也需要说明。原论文在 ImageNet 上报告 SE 带来约 1.5 个百分点的 top-1 提升，"
         "后续在 CIFAR 上的复现通常也只有零点几个百分点，且多依赖更深的骨干（ResNet-110、WRN）。本文"
-        "的 +0.09 落在区间低端，原因是骨干更浅、更窄，且训练预算只有 100 epoch。这不是对 SE 的"
+        "的 +0.08 落在区间低端，原因是骨干更浅、更窄，且训练预算只有 100 epoch。这不是对 SE 的"
         "否定，而是给出它的适用边界：当骨干本身很小时，先加残差、加宽或加深，比加注意力更划算。"
+    )
+    body(
+        "表 7 把第 1 节的三个研究问题与第 5 节的证据逐条对应，便于检查结论是否由数据支撑。"
+    )
+    add_table(
+        ["研究问题", "关键证据", "结论"],
+        [
+            ["RQ1 残差能否缓解退化",
+             f"Plain：{acc('Plain-20'):.2f}%→{acc('Plain-56'):.2f}%（"
+             f"{acc('Plain-56') - acc('Plain-20'):+.2f}）；ResNet：{acc('ResNet-20'):.2f}%→"
+             f"{acc('ResNet-56'):.2f}%（{acc('ResNet-56') - acc('ResNet-20'):+.2f}）；56 层差距 "
+             f"{acc('ResNet-56') - acc('Plain-56'):.2f}",
+             "退化可复现；残差是主导因素"],
+            ["RQ2 SE 能否带来可重复收益",
+             f"SE {acc('SE-ResNet-20'):.2f}%（{acc('SE-ResNet-20') - acc('ResNet-20'):+.2f}，"
+             f"p=0.56）；ECE {ece('ResNet-20'):.4f}→{ece('SE-ResNet-20'):.4f}；损坏 "
+             f"{rob_mean('ResNet-20'):.2f}%→{rob_mean('SE-ResNet-20'):.2f}%",
+             "精度增益有限；校准与鲁棒性有稳定收益"],
+            ["RQ3 限制因素是什么",
+             "r/插入位置差异 <0.2；预激活 +0.25（种子差 0.43）；Mixup +0.55；标签平滑 −0.41 "
+             "且 ECE 0.0585",
+             "结构与正则是更大杠杆；短预算下标签平滑有害"],
+        ],
+        [3.4, 8.6, 3.6],
+        "表 7  研究问题、关键证据与结论的对应关系",
+        font_size=7.5,
     )
     body(
         "局限主要有四点。其一，只用了 CIFAR-10 一个数据集，结论能否迁移到 CIFAR-100、Tiny-ImageNet"
@@ -960,7 +994,8 @@ def section_conclusion() -> None:
         "这些结果支持的结论是：在轻量模型上，残差连接是主导因素，通道注意力是次要的、更多作用于"
         "鲁棒性与置信度质量的模块；结构与数据正则（预激活、Mixup）比注意力更值得优先尝试。对于"
         "实际应用，如果目标是 top-1 准确率，应优先保证残差结构、足够的宽度和训练预算；如果目标"
-        "包含可靠的置信度或损坏鲁棒性，SE 可以作为低成本的补充。本文不提出新结构，贡献在于把复现、"
+        "包含可靠的置信度或损坏鲁棒性，SE 可以作为低成本的补充。本文的提出方法 SE-ResNet-20 不是"
+        "全新的网络结构，而是把 SE 模块嵌入残差块的组合；贡献在于把复现、"
         "消融和多维分析放在同一套可复查的实验里，并公开全部代码、权重与逐样本预测。"
     )
 
@@ -1065,7 +1100,6 @@ def section_appendix() -> None:
         ".npz 文件保存了 10,000 张测试图的 logits 与标签，McNemar、ECE、混淆矩阵都可由此复算。"
     )
 
-    doc.add_page_break()
     heading("附录 B  运行环境与训练开销")
     env_rows = [
         ["GPU", "NVIDIA GeForce RTX 5060 Laptop GPU, 8 GB"],
